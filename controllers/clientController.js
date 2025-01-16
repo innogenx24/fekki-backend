@@ -1,4 +1,5 @@
 const { Client, User } = require('../models');
+const { Op } = require('sequelize');
 
 // Create a new client
 exports.createClient = async (req, res) => {
@@ -22,18 +23,47 @@ exports.createClient = async (req, res) => {
   } = req.body;
 
   try {
-    const userRoleId = req.user.role_id;  
-    
-    let role_id = 2; 
+    const userRoleId = req.user.role_id;
+
+    let role_id = 2;
 
     if (userRoleId === 1) {
-      role_id = 2;  
+      role_id = 2;
     }
 
     const clientStatus = status === 'true' || status === true ? 1 : 0;
 
     const image = req.files && req.files['image'] ? req.files['image'][0].filename : null;
 
+    // Check if email already exists
+    const existingEmail = await Client.findOne({
+      where: {
+        email: email,
+      },
+    });
+
+    if (existingEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already exists.',
+      });
+    }
+
+    // Check if mobile number already exists
+    const existingMobile = await Client.findOne({
+      where: {
+        mobileNumber: mobileNumber,
+      },
+    });
+
+    if (existingMobile) {
+      return res.status(400).json({
+        success: false,
+        message: 'Mobile number already exists.',
+      });
+    }
+
+    // Proceed with creating client and user if checks pass
     const client = await Client.create({
       clientId,
       clientBrand,
@@ -42,7 +72,7 @@ exports.createClient = async (req, res) => {
       mobileNumber,
       email,
       loginId,
-      password, 
+      password,
       country,
       state,
       username,
@@ -50,20 +80,22 @@ exports.createClient = async (req, res) => {
       street,
       landmark,
       pincode,
-      image,        
+      image,
       status: clientStatus,
-      role_id: role_id,  
-      higher_role_id: userRoleId, 
+      role_id: role_id,
+      higher_role_id: userRoleId,
     });
 
     const role_names = 'Client';
 
     const user = await User.create({
-      username: username,  
-      password: password,  
-      role_id: role_id,   
-      mobile_number: mobileNumber,  
+      client_id: client.id,
+      username: username,
+      password: password,
+      role_id: role_id,
+      mobile_number: mobileNumber,
       role_name: role_names,
+      email: email,  // Add email to the user record
     });
 
     // Prepare the response with the new client data
@@ -81,15 +113,15 @@ exports.createClient = async (req, res) => {
       street: client.street,
       landmark: client.landmark,
       pincode: client.pincode,
-      status: client.status, 
-      image: client.image,  
+      status: client.status,
+      image: client.image,
       role_id: client.role_id,
       higher_role_id: client.higher_role_id,
       user: {
-        username: user.username,  
-        role_id: user.role_id,   
-        role_name: user.role_name, 
-      }
+        username: user.username,
+        role_id: user.role_id,
+        role_name: user.role_name,
+      },
     };
 
     // Return a success response
@@ -108,13 +140,9 @@ exports.createClient = async (req, res) => {
 };
 
 
-
-
-
-
 // Update an existing client
 exports.updateClient = async (req, res) => {
-  const { id } = req.params; 
+  const { id } = req.params; // Extract client ID from route params
   const {
     clientBrand,
     firstName,
@@ -133,7 +161,7 @@ exports.updateClient = async (req, res) => {
   } = req.body;
 
   try {
-    // Find the client by id
+    // Find the client by ID
     const client = await Client.findOne({ where: { id } });
 
     if (!client) {
@@ -143,10 +171,40 @@ exports.updateClient = async (req, res) => {
       });
     }
 
+    // Check for duplicate email (excluding the current client)
+    const existingEmail = await Client.findOne({
+      where: {
+        email: email,
+        id: { [Op.ne]: id }, // Exclude the current client
+      },
+    });
+
+    if (existingEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already exists for another client.',
+      });
+    }
+
+    // Check for duplicate mobile number (excluding the current client)
+    const existingMobile = await Client.findOne({
+      where: {
+        mobileNumber: mobileNumber,
+        id: { [Op.ne]: id }, // Exclude the current client
+      },
+    });
+
+    if (existingMobile) {
+      return res.status(400).json({
+        success: false,
+        message: 'Mobile number already exists for another client.',
+      });
+    }
+
     // Update status: Convert to boolean and then to 1 or 0 (1 for active, 0 for inactive)
     const clientStatus = status === 'true' || status === true ? 1 : 0;
 
-    // Extract image file if it is provided in the request
+    // Extract image file if provided
     const image = req.files && req.files['image'] ? req.files['image'][0].filename : null;
 
     // Update the client entry in the database
@@ -164,13 +222,13 @@ exports.updateClient = async (req, res) => {
       street,
       landmark,
       pincode,
-      image: image || client.image, // Keep the existing image if not updated
+      image: image || client.image, // Retain the existing image if not updated
       status: clientStatus, // Update the client status
     });
 
     // Prepare the response with updated client data
     const updatedData = {
-      id: client.id,  // Use id instead of clientId
+      id: client.id,
       clientBrand: client.clientBrand,
       firstName: client.firstName,
       lastName: client.lastName,
@@ -203,6 +261,7 @@ exports.updateClient = async (req, res) => {
 
 
 
+
 exports.getClientById = async (req, res) => {
   const { id } = req.params;
 
@@ -219,7 +278,7 @@ exports.getClientById = async (req, res) => {
 
     // Prepare the response with client data
     const responseData = {
-      id: client.id,            // Client's primary key
+      id: client.id,           
       clientBrand: client.clientBrand,
       firstName: client.firstName,
       lastName: client.lastName,
@@ -233,8 +292,8 @@ exports.getClientById = async (req, res) => {
       street: client.street,
       landmark: client.landmark,
       pincode: client.pincode,
-      status: client.status,  // Client status (active or inactive)
-      image: client.image,    // Image filename
+      status: client.status,  
+      image: client.image,    
     };
 
     return res.status(200).json({
@@ -256,8 +315,14 @@ exports.getClientById = async (req, res) => {
 
 exports.getAllClients = async (req, res) => {
   try {
-    // Fetch all clients from the database
-    const clients = await Client.findAll();
+    // Fetch all clients excluding those with role_id = 1
+    const clients = await Client.findAll({
+      where: {
+        role_id: {
+          [Op.ne]: 1, // This excludes clients with role_id = 1
+        },
+      },
+    });
 
     // Respond with the list of clients
     res.status(200).json({
@@ -274,6 +339,7 @@ exports.getAllClients = async (req, res) => {
     });
   }
 };
+
 
 
 ///////////STATUS UPDATED///////////

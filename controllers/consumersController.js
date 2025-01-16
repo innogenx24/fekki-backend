@@ -1,30 +1,46 @@
 const { Consumer, ConsumerProduct } = require('../models');
+const { Op } = require('sequelize');
 
 exports.createConsumer = async (req, res) => {
     const { firstName, mobileNumber, email, activeStatus, selectedProducts } = req.body;
 
     try {
-        // Get the logged-in user's role_id from the token
-        const loggedInUserRoleId = req.user.role_id;
+        const existingConsumer = await Consumer.findOne({
+            where: {
+                [Op.or]: [
+                    { mobile_number: mobileNumber },
+                    { email: email }
+                ]
+            }
+        });
 
-        // Ensure the user has permission to create a consumer
-        if (![1, 2].includes(loggedInUserRoleId)) {
-            return res.status(403).json({
-                success: false,
-                message: 'You are not authorized to create a consumer.',
-            });
+        if (existingConsumer) {
+            if (existingConsumer.mobile_number === mobileNumber) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Mobile number already exists.',
+                });
+            }
+
+            if (existingConsumer.email === email) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Email already exists.',
+                });
+            }
         }
 
-        // Create the consumer with the appropriate role_id
+        const loggedInUserRoleId = req.user.client_id || 1;
+
+        // Create the new consumer
         const consumer = await Consumer.create({
             first_name: firstName,
             mobile_number: mobileNumber,
             email,
             active_status: activeStatus === 'true' || activeStatus === true ? 1 : 0,
-            role_id: loggedInUserRoleId, // Explicitly set role_id
+            role_id: loggedInUserRoleId,
         });
 
-        // If selectedProducts is provided and not empty, create ConsumerProduct records
         if (Array.isArray(selectedProducts) && selectedProducts.length > 0) {
             const consumerProducts = selectedProducts.map((productId) => ({
                 consumer_id: consumer.id,
@@ -55,13 +71,13 @@ exports.createConsumer = async (req, res) => {
 
 
 exports.updateConsumer = async (req, res) => {
-    const { id } = req.params; // Get the consumerId from the URL parameter
+    const { id } = req.params;
     const { firstName, mobileNumber, email, activeStatus, selectedProducts } = req.body;
 
     try {
-        // Find the consumer by ID
-        const consumer = await Consumer.findByPk(id); // Use the 'id' from URL parameters
-        
+        // Check if the consumer exists
+        const consumer = await Consumer.findByPk(id);
+
         if (!consumer) {
             return res.status(404).json({
                 success: false,
@@ -69,7 +85,34 @@ exports.updateConsumer = async (req, res) => {
             });
         }
 
-        // Update the consumer's details
+        // Check if the mobileNumber or email already exists (excluding the current consumer)
+        const existingConsumer = await Consumer.findOne({
+            where: {
+                [Op.or]: [
+                    { mobile_number: mobileNumber },
+                    { email: email }
+                ],
+                id: { [Op.ne]: id } // Exclude the current consumer from the check
+            }
+        });
+
+        if (existingConsumer) {
+            if (existingConsumer.mobile_number === mobileNumber) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Mobile number already exists.',
+                });
+            }
+
+            if (existingConsumer.email === email) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Email already exists.',
+                });
+            }
+        }
+
+        // Update the consumer details
         await consumer.update({
             first_name: firstName,
             mobile_number: mobileNumber,
@@ -77,7 +120,7 @@ exports.updateConsumer = async (req, res) => {
             active_status: activeStatus === 'true' || activeStatus === true ? 1 : 0,
         });
 
-        // Remove any existing ConsumerProduct records for this consumer
+        // Remove existing consumer product associations
         await ConsumerProduct.destroy({
             where: {
                 consumer_id: consumer.id,
@@ -116,14 +159,24 @@ exports.updateConsumer = async (req, res) => {
 
 
 exports.getAllConsumers = async (req, res) => {
+const loggedInUserRoleId = req.user.client_id !== null ? req.user.client_id : 1;
+
     try {
-        const consumers = await Consumer.findAll(); // Retrieve all consumers
+        // Fetch customers whose role_id matches the logged-in user's role_id
+        const consumers = await Consumer.findAll({
+            where: {
+                role_id: loggedInUserRoleId, // Filter customers by role_id
+            },
+        });
+
+        // Send the response with the list of consumers
         return res.status(200).json({
             success: true,
+            message: 'Consumers fetched successfully.',
             data: consumers,
         });
     } catch (error) {
-        console.error(error);
+        console.error('Error fetching consumers:', error);
         return res.status(500).json({
             success: false,
             message: 'An error occurred while fetching consumers.',

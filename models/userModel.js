@@ -24,6 +24,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING(50),
       allowNull: false,
     },
+    client_id: {  // Add the role_id field
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
     role_id: {  // Add the role_id field
       type: DataTypes.INTEGER,
       allowNull: false,

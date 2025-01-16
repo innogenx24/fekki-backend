@@ -1,7 +1,6 @@
 const jwt = require('jsonwebtoken');
-const { User } = require('../models'); // Import the User model
+const { User, Client } = require('../models');
 
-// Controller function for user login
 exports.userLogin = async (req, res) => {
   const { username, password } = req.body;
 
@@ -21,14 +20,32 @@ exports.userLogin = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Check if password matches (Here, you can replace with password hashing check if needed)
+    // Check if password matches
     if (user.password !== password) {
       return res.status(401).json({ message: 'Invalid password' });
     }
 
+    // Check if user has a valid client_id
+    if (user.client_id) {
+      // Find the associated client record based on client_id
+      const client = await Client.findOne({
+        where: { id: user.client_id }
+      });
+
+      // Check if client exists
+      if (!client) {
+        return res.status(404).json({ message: 'Associated client not found' });
+      }
+    }
+
     // Generate JWT token
     const token = jwt.sign(
-      { id: user.id, username: user.username, role_name: user.role_name },
+      { 
+        id: user.id, 
+        username: user.username, 
+        role_name: user.role_name,
+        client_id: user.client_id || null,  // Include client_id if found
+      },
       process.env.JWT_SECRET, // Ensure you have this in your .env file
       { expiresIn: '1h' } // Set an expiration time (optional)
     );
@@ -37,12 +54,13 @@ exports.userLogin = async (req, res) => {
     return res.status(200).json({
       message: 'Login successful',
       user: {
+        id: user.id,
         role_id: user.role_id,
         username: user.username,
-        role_name: user.role_name
+        role_name: user.role_name,
+        client_id: user.client_id || null,  // Include client_id in the response
       },
-      token: token, 
-
+      token: token,
     });
   } catch (error) {
     console.error('Error during login:', error);

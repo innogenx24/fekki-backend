@@ -19,7 +19,6 @@ module.exports = (sequelize, DataTypes) => {
     email: {
       type: DataTypes.STRING(100),
       allowNull: false,
-      unique: true, // Assuming email should be unique
     },
     active_status: {
       type: DataTypes.TINYINT(1),

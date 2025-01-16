@@ -1,4 +1,5 @@
 const { Product } = require('../models');
+const { Op } = require('sequelize');
 
 // Create a new product
 exports.createProduct = async (req, res) => {
@@ -9,44 +10,49 @@ exports.createProduct = async (req, res) => {
     productType,
     subProductType,
     isActive,
-    category,      // Added category field
-    subCategory,   // Added sub_category field
+    category,     
+    subCategory,  
   } = req.body;
 
   try {
-    // Convert isActive to a boolean and then to 1 or 0 (1 for true, 0 for false)
+    // Check if productName already exists
+    const existingProduct = await Product.findOne({ where: { product_name: productName } });
+    if (existingProduct) {
+      return res.status(400).json({
+        success: false,
+        message: 'Product with the same name already exists.',
+      });
+    }
+
     const productStatus = isActive === 'true' || isActive === true ? 1 : 0;
 
-    // Extract files from the request (both thumbnail and fileDetails)
     const thumbnail = req.files && req.files['thumbnail'] ? req.files['thumbnail'][0].filename : null;
     const fileDetails = req.files && req.files['fileDetails'] ? req.files['fileDetails'][0].filename : null;
 
-    // Create the product entry in the database
     const product = await Product.create({
       product_name: productName,
       model_name: modelName,
       description,
       product_type: productType,
       sub_product_type: subProductType,
-      file_details: fileDetails,  // Store the PDF or ZIP file name
-      is_active: productStatus,   // Set the product active status
-      thumbnail: thumbnail,       // Store the image file name
-      category,                  // Added category
-      sub_category: subCategory, // Added sub_category
+      file_details: fileDetails, 
+      is_active: productStatus,   
+      thumbnail: thumbnail,      
+      category,                  
+      sub_category: subCategory,
     });
 
-    // Prepare the response with product data
     const responseData = {
       productName: product.product_name,
       modelName: product.model_name,
       description: product.description,
       productType: product.product_type,
       subProductType: product.sub_product_type,
-      fileDetails: product.file_details, // Filename of the PDF or ZIP file
+      fileDetails: product.file_details,
       isActive: product.is_active,
-      thumbnail: product.thumbnail, // Filename of the image file
-      category: product.category,    // Added category to the response
-      subCategory: product.sub_category, // Added sub_category to the response
+      thumbnail: product.thumbnail, 
+      category: product.category,    
+      subCategory: product.sub_category, 
     };
 
     return res.status(201).json({
@@ -62,6 +68,7 @@ exports.createProduct = async (req, res) => {
     });
   }
 };
+
 
 
 //////GET ID BY PRODUCT DETAILS////////
@@ -90,13 +97,13 @@ exports.getProductById = async (req, res) => {
       description: product.description,
       productType: product.product_type,
       subProductType: product.sub_product_type,
-      fileDetails: product.file_details, // Filename of the PDF or ZIP file
+      fileDetails: product.file_details,
       isActive: product.is_active,
-      thumbnail: product.thumbnail, // Filename of the image file
-      category: product.category,    // Added category to the response
-      subCategory: product.sub_category, // Added sub_category to the response
-      createdAt: product.created_at, // Created date
-      updatedAt: product.updated_at, // Updated date
+      thumbnail: product.thumbnail, 
+      category: product.category,    
+      subCategory: product.sub_category, 
+      createdAt: product.created_at, 
+      updatedAt: product.updated_at, 
     };
 
     return res.status(200).json({
@@ -122,16 +129,13 @@ exports.getProductById = async (req, res) => {
 // Get all products
 exports.getAllProducts = async (req, res) => {
   try {
-    // Extract role_id from the user
     const roleId = req.user.role_id;
-    console.log('User Role ID:', roleId); // Log role_id for debugging
+    console.log('User Role ID:', roleId); 
 
-    // Fetch all products from the database
     const products = await Product.findAll();
 
-    console.log('Fetched Products:', products); // Log fetched products for debugging
+    console.log('Fetched Products:', products);
 
-    // Check if products were found
     if (products.length === 0) {
       return res.status(404).json({
         success: false,
@@ -139,12 +143,11 @@ exports.getAllProducts = async (req, res) => {
       });
     }
 
-    // Filter products based on role (B2B for Client role)
     let filteredProducts = products;
 
-    if (roleId === 2) { // Check if the role is Client
-      filteredProducts = products.filter(product => product.product_type === 'B2B'); // Change productType to product_type
-      console.log('Filtered Products for Client:', filteredProducts); // Log filtered products
+    if (roleId === 2) {
+      filteredProducts = products.filter(product => product.product_type === 'B2B'); 
+      console.log('Filtered Products for Client:', filteredProducts);
     }
     
 
@@ -156,13 +159,13 @@ exports.getAllProducts = async (req, res) => {
       description: product.description,
       productType: product.product_type,
       subProductType: product.sub_product_type,
-      fileDetails: product.file_details, // Filename of the PDF or ZIP file
+      fileDetails: product.file_details, 
       isActive: product.is_active,
-      thumbnail: product.thumbnail, // Filename of the image file
-      category: product.category,    // Added category to the response
-      subCategory: product.sub_category, // Added sub_category to the response
-      createdAt: product.created_at, // Created date
-      updatedAt: product.updated_at, // Updated date
+      thumbnail: product.thumbnail, 
+      category: product.category,  
+      subCategory: product.sub_category, 
+      createdAt: product.created_at, 
+      updatedAt: product.updated_at, 
     }));
 
     return res.status(200).json({
@@ -197,11 +200,18 @@ exports.updateProduct = async (req, res) => {
   } = req.body;
 
   try {
-
-    const productStatus = isActive === 'true' || isActive === true ? 1 : 0;
-
-    const thumbnail = req.files && req.files['thumbnail'] ? req.files['thumbnail'][0].filename : null;
-    const fileDetails = req.files && req.files['fileDetails'] ? req.files['fileDetails'][0].filename : null;
+    // Check if productName already exists (excluding the current product)
+    if (productName) {
+      const existingProduct = await Product.findOne({
+        where: { product_name: productName, id: { [Op.ne]: id } },
+      });
+      if (existingProduct) {
+        return res.status(400).json({
+          success: false,
+          message: 'Another product with the same name already exists.',
+        });
+      }
+    }
 
     const product = await Product.findByPk(id);
     if (!product) {
@@ -210,6 +220,11 @@ exports.updateProduct = async (req, res) => {
         message: 'Product not found.',
       });
     }
+
+    const productStatus = isActive === 'true' || isActive === true ? 1 : 0;
+
+    const thumbnail = req.files && req.files['thumbnail'] ? req.files['thumbnail'][0].filename : null;
+    const fileDetails = req.files && req.files['fileDetails'] ? req.files['fileDetails'][0].filename : null;
 
     const updatedProduct = await product.update({
       product_name: productName || product.product_name,

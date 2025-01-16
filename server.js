@@ -16,8 +16,17 @@ const productRoutes = require('./routes/productRoutes');
 const userRoutes = require('./routes/userRoutes');
 const consumerRoutes = require('./routes/consumerRoutes');
 const clientRoutes = require('./routes/clientRoutes');
-
 const customerRoutes = require('./routes/customerRoutes');
+const roleRoutes = require('./routes/roleRoutes');
+const deportmentRoutes = require('./routes/deportmentRoutes');
+const categoryRoutes = require('./routes/categoryRoutes');
+const subCategoryRoutes = require('./routes/subCategoryRoutes');
+const locationRoutes = require('./routes/locationRoutes');
+const branchRoutes = require('./routes/branchRoutes');
+const productTypeRoutes = require('./routes/productTypeRoutes');
+
+
+
 
 
 const app = express();
@@ -42,7 +51,13 @@ app.use('/api/user', userRoutes);
 app.use('/api/consumer', consumerRoutes);
 app.use('/api/client', clientRoutes);
 app.use('/api/customer', customerRoutes);
-
+app.use('/api/roles', roleRoutes);
+app.use('/api/department', deportmentRoutes);
+app.use('/api/category', categoryRoutes);
+app.use('/api/sub-category', subCategoryRoutes);
+app.use('/api/location', locationRoutes);
+app.use('/api/branch', branchRoutes);
+app.use('/api/product-type', productTypeRoutes);
 
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -55,17 +70,6 @@ io.on('connection', (socket) => {
     console.log('User disconnected:', socket.id);
   });
 });
-
-// Schedule monthly notification job
-cron.schedule('0 12 15 * *', async () => {
-  console.log('Running monthly notification job...');
-  try {
-    await sendMonthlyNotifications();
-  } catch (error) {
-    console.error('Error in monthly notification job:', error);
-  }
-});
-//**send-notifications don't call this api --> only for development**//
 
 server.listen(port, async () => {
   try {

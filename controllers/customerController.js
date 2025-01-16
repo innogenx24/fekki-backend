@@ -25,7 +25,7 @@ exports.createCustomer = async (req, res) => {
   } = req.body;
 
   // Retrieve the logged-in user's role_id
-  const loggedInUserRoleId = req.user.role_id;
+  const loggedInUserRoleId = req.user.client_id || 1;
 
   try {
     const teamHeadStatus = isTeamHead === 'true' || isTeamHead === true ? 1 : 0;
@@ -114,6 +114,7 @@ exports.getCustomerById = async (req, res) => {
         roleName: customer.role_name,
         role_id: customer.role_id,
         department: customer.department,
+        password:customer.password,
         branch: customer.branch,
         emailId: customer.email_id,
         phoneNumber: customer.phone_number,
@@ -260,7 +261,7 @@ exports.deleteCustomerById = async (req, res) => {
   // Get all customers based on logged-in user's role_id
 exports.getAllCustomersByRole = async (req, res) => {
     // Retrieve the logged-in user's role_id
-    const loggedInUserRoleId = req.user.role_id;
+    const loggedInUserRoleId = req.user.client_id || 1;
   
     try {
       // Fetch customers whose role_id matches the logged-in user's role_id
