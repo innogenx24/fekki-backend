@@ -1,5 +1,6 @@
 const { Customer } = require('../models');
 const Sequelize = require('sequelize'); // Ensure Sequelize is defined
+const { Op } = require('sequelize');
 
 // Create a new customer
 exports.createCustomer = async (req, res) => {
@@ -28,17 +29,41 @@ exports.createCustomer = async (req, res) => {
   const loggedInUserRoleId = req.user.client_id || 1;
 
   try {
+
+    const existingCustomer = await Customer.findOne({
+      where: {
+        [Op.or]: [
+          { email_id: emailId },
+          { phone_number: phoneNumber },
+        ],
+      },
+    });
+
+    if (existingCustomer) {
+      if (existingCustomer.email_id === emailId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email already exists.',
+        });
+      }
+      if (existingCustomer.phone_number === phoneNumber) {
+        return res.status(400).json({
+          success: false,
+          message: 'Phone number already exists.',
+        });
+      }
+    }
+
     const teamHeadStatus = isTeamHead === 'true' || isTeamHead === true ? 1 : 0;
     const roleBasedStatus = roleBased === 'true' || roleBased === true ? 1 : 0;
 
-    // Create the customer entry in the database, including the role_id
     const customer = await Customer.create({
       first_name: firstName,
       last_name: lastName,
       username,
-      password,  // In production, remember to hash the password before saving it
+      password,  
       role_name: roleName,
-      role_id: loggedInUserRoleId,  // Assign the logged-in user's role_id
+      role_id: loggedInUserRoleId,  
       department,
       branch,
       email_id: emailId,
@@ -177,16 +202,33 @@ exports.updateCustomerById = async (req, res) => {
           message: 'Customer not found.',
         });
       }
-  
-      // Check if email ID already exists for another customer
-      const existingCustomer = await Customer.findOne({ where: { email_id: emailId, id: { [Sequelize.Op.ne]: customerId } } });
+
+      const existingCustomer = await Customer.findOne({
+        where: {
+          [Op.or]: [
+            { phone_number: phoneNumber},
+            { email_id:emailId },
+          ],
+          id: { [Op.ne]: customerId  }, 
+        },
+      });
   
       if (existingCustomer) {
-        return res.status(400).json({
-          success: false,
-          message: 'Email ID is already in use by another customer.',
-        });
+        if (existingCustomer.phone_number === phoneNumber) {
+          return res.status(400).json({
+            success: false,
+            message: 'Mobile number is already in use by another customer.',
+          });
+        }
+        if (existingCustomer.email_id === emailId) {
+          return res.status(400).json({
+            success: false,
+            message: 'Email ID is already in use by another customer.',
+          });
+        }
       }
+  
+      
   
       // Update the customer details
       customer.first_name = firstName;
