@@ -1,5 +1,6 @@
 const { SubCategory } = require('../models'); // Assuming SubCategory model is used instead of Category
 const Sequelize = require('sequelize');
+const { Op } = require('sequelize');
 
 // Create SubCategory
 exports.createSubCategory = async (req, res) => {
@@ -9,7 +10,7 @@ exports.createSubCategory = async (req, res) => {
   try {
     // Check if the sub-category already exists
     const existingSubCategory = await SubCategory.findOne({
-      where: { sub_category, role_id: loggedInUserRoleId },
+      where: {category, sub_category, role_id: loggedInUserRoleId },
     });
 
     if (existingSubCategory) {
@@ -79,67 +80,65 @@ exports.getSubCategoryById = async (req, res) => {
 
 // Update SubCategory by ID with timestamp check
 exports.updateSubCategoryById = async (req, res) => {
-    const { id } = req.params;
-    const { category, sub_category, description } = req.body;
-  
-    try {
-      // Check if a sub_category already exists with the same category and sub_category
-      const existingSubCategoryWithSameValues = await SubCategory.findOne({
-        where: { category, sub_category },
-      });
-  
-      if (existingSubCategoryWithSameValues && existingSubCategoryWithSameValues.id !== id) {
-        return res.status(400).json({
-          success: false,
-          message: 'This sub-category already exists for the given category.',
-        });
-      }
-  
-      // Find the existing subcategory to compare with the new data
-      const existingSubCategory = await SubCategory.findOne({
-        where: { id: id },
-      });
-  
+  const { id } = req.params;
+  const { category, sub_category, description } = req.body;
+
+  try {
+      // Check if the subcategory exists
+      const existingSubCategory = await SubCategory.findOne({ where: { id } });
+
       if (!existingSubCategory) {
-        return res.status(404).json({
-          success: false,
-          message: 'SubCategory not found.',
-        });
+          return res.status(404).json({
+              success: false,
+              message: 'SubCategory not found.',
+          });
       }
-  
-      // Check if the sub-category or description has changed
-      if (existingSubCategory.sub_category !== sub_category && existingSubCategory.description === description) {
-        return res.status(400).json({
-          success: false,
-          message: 'No changes detected to update the subcategory.',
-        });
+
+      // Check for duplicate category or subcategory
+      const existingDepartment = await SubCategory.findOne({
+          where: {
+              [Op.or]: [
+                  { category },
+                  { sub_category },
+              ],
+              id: { [Op.ne]: id }, 
+          },
+      });
+
+      if (existingDepartment) {
+          if (existingDepartment.sub_category === sub_category) {
+              return res.status(400).json({
+                  success: false,
+                  message: 'SubCategory already exists for this role.',
+              });
+          }
       }
-  
+
       // Perform the update
-      const updatedSubCategory = await SubCategory.update(
-        { category, sub_category, description },
-        { where: { id: id } }
+      const [rowsUpdated] = await SubCategory.update(
+          { category, sub_category, description },
+          { where: { id } }
       );
-  
-      if (updatedSubCategory[0] === 0) {
-        return res.status(404).json({
-          success: false,
-          message: 'SubCategory not found.',
-        });
+
+      if (rowsUpdated === 0) {
+          return res.status(404).json({
+              success: false,
+              message: 'SubCategory not found.',
+          });
       }
-  
+
       return res.status(200).json({
-        success: true,
-        message: 'SubCategory updated successfully.',
+          success: true,
+          message: 'SubCategory updated successfully.',
       });
-    } catch (error) {
-      console.error(error);
+  } catch (error) {
+      console.error('Error updating subcategory:', error);
       return res.status(500).json({
-        success: false,
-        message: 'An error occurred while updating the subcategory.',
+          success: false,
+          message: 'An error occurred while updating the subcategory.',
       });
-    }
-  };
+  }
+};
   
 
 // Delete SubCategory by ID

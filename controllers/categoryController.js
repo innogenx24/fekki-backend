@@ -1,5 +1,6 @@
 const { Category } = require('../models'); // Update the import to Category model
 const Sequelize = require('sequelize');
+const { Op } = require('sequelize');
 
 exports.createCategory = async (req, res) => {
     const { category, description } = req.body;
@@ -92,13 +93,22 @@ exports.updateCategoryById = async (req, res) => {
       });
     }
 
-    // Check if the category or description has changed
-    if (existingCategory.category === category && existingCategory.description === description) {
-      return res.status(400).json({
-        success: false,
-        message: 'No changes detected to update the category.',
-      });
-    }
+    const existingCategory1 = await Category.findOne({
+         where: {
+           [Op.or]: [
+             { category: category },
+           ],
+         },
+       });
+   
+       if (existingCategory1) {
+         if (existingCategory1.category === category) {
+           return res.status(400).json({
+             success: false,
+             message: 'Category already exists for this role.',
+           });
+         }
+       }
 
     // Perform the update
     const updatedCategory = await Category.update(

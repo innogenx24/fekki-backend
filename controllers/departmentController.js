@@ -1,5 +1,6 @@
 const { Department } = require('../models'); // Update the import to Department model
 const Sequelize = require('sequelize');
+const { Op } = require('sequelize');
 
 // Create a new department
 exports.createDepartment = async (req, res) => {
@@ -7,11 +8,33 @@ exports.createDepartment = async (req, res) => {
   const loggedInUserRoleId = req.user.client_id || 1;
   
   try {
+
+
+    const existingDepartment = await Department.findOne({
+      where: {
+        [Op.or]: [
+          { department: department },
+        ],
+      },
+    });
+
+    if (existingDepartment) {
+      if (existingDepartment.department === department) {
+        return res.status(400).json({
+          success: false,
+          message: 'Department Name is already exists.',
+        });
+      }
+    }
+
+
     const newDepartment = await Department.create({
       role_id: loggedInUserRoleId,
       department,
       description,
     });
+
+
 
     const responseData = {
       deportment: newDepartment.department,
@@ -78,6 +101,23 @@ exports.updateDepartmentById = async (req, res) => {
         success: false,
         message: 'Department not found.',
       });
+    }
+
+    const existingDepartment = await Department.findOne({
+      where: {
+        [Op.or]: [
+          { department: department },
+        ],
+      },
+    });
+
+    if (existingDepartment) {
+      if (existingDepartment.department === department) {
+        return res.status(400).json({
+          success: false,
+          message: 'Department Name is already exists.',
+        });
+      }
     }
 
     return res.status(200).json({
